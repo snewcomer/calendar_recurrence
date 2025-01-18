@@ -22,7 +22,7 @@ defmodule CalendarRecurrence.RRULE do
   # wkst: nil
 
   @type t() :: %__MODULE__{
-          freq: :weekly | :daily | :hourly | :minutely | :secondly | nil,
+          freq: :monthly | :weekly | :daily | :hourly | :minutely | :secondly | nil,
           interval: pos_integer(),
           until: CalendarRecurrence.date() | nil,
           count: non_neg_integer() | nil
@@ -135,6 +135,18 @@ defmodule CalendarRecurrence.RRULE do
 
   defp convert_date_type(%RRULE{until: until}, _), do: until
 
+  defp step(%RRULE{freq: :monthly, interval: interval}) do
+    fn
+      %DateTime{} = date ->
+        new_date = add_months(date, interval)
+        DateTime.diff(new_date, date, :second)
+
+      date ->
+        new_date = add_months(date, interval)
+        Date.diff(new_date, date)
+    end
+  end
+
   defp step(%RRULE{freq: :weekly, byday: [], interval: interval}),
     do: fn
       %DateTime{} = date ->
@@ -193,4 +205,38 @@ defmodule CalendarRecurrence.RRULE do
     do: fn date ->
       DateTime.add(date, interval, :second) |> DateTime.diff(date, :second)
     end
+
+  defp add_months(%DateTime{} = date, months) do
+    total_months = date.month + months
+    new_year = date.year + div(total_months - 1, 12)
+    new_month = rem(total_months - 1, 12) + 1
+
+    days_in_month = :calendar.last_day_of_the_month(new_year, new_month)
+    IO.inspect {date.day, days_in_month}
+    new_day = if date.day > days_in_month, do: days_in_month, else: date.day
+
+    %{date | year: new_year, month: new_month, day: new_day}
+  end
+
+  defp add_months(%Date{} = date, months) do
+    total_months = date.month + months
+    new_year = date.year + div(total_months - 1, 12)
+    new_month = rem(total_months - 1, 12) + 1
+
+    days_in_month = :calendar.last_day_of_the_month(new_year, new_month)
+    new_day = min(date.day, days_in_month)
+
+    %Date{year: new_year, month: new_month, day: new_day}
+  end
+
+  defp add_months(%NaiveDateTime{} = date, months) do
+    total_months = date.month + months
+    new_year = date.year + div(total_months - 1, 12)
+    new_month = rem(total_months - 1, 12) + 1
+
+    days_in_month = :calendar.last_day_of_the_month(new_year, new_month)
+    new_day = min(date.day, days_in_month)
+
+    %{date | year: new_year, month: new_month, day: new_day}
+  end
 end
